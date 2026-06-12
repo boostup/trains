@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,6 +17,7 @@
             --accent: #47a7f5;
             --accent-gradient: linear-gradient(135deg, #47a7f5, #2670e8);
         }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg-color);
@@ -27,26 +29,31 @@
             align-items: center;
             -webkit-tap-highlight-color: transparent;
         }
+
         .container {
             width: 100%;
             max-width: 380px;
         }
+
         .header {
             text-align: center;
             margin-bottom: 28px;
         }
+
         .route-title {
             font-size: 1.4rem;
             font-weight: 700;
             letter-spacing: -0.5px;
             margin-bottom: 4px;
         }
+
         .route-sub {
             font-size: 0.85rem;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 1px;
         }
+
         .train-card {
             background-color: var(--card-color);
             border-radius: 14px;
@@ -58,14 +65,17 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
             border: 1px solid rgba(255, 255, 255, 0.03);
         }
+
         .time {
             font-size: 2.2rem;
             font-weight: 800;
             letter-spacing: -1px;
         }
+
         .details {
             text-align: right;
         }
+
         .type {
             font-size: 0.75rem;
             background: rgba(255, 255, 255, 0.08);
@@ -74,18 +84,21 @@
             color: var(--text-muted);
             font-weight: 600;
         }
+
         .status-delayed {
             font-size: 0.8rem;
             color: #ff5252;
             font-weight: 600;
             margin-top: 6px;
         }
+
         .loader {
             text-align: center;
             color: var(--text-muted);
             margin-top: 60px;
             font-size: 0.95rem;
         }
+
         .refresh-btn {
             background: var(--accent-gradient);
             color: #ffffff;
@@ -99,12 +112,14 @@
             width: 100%;
             box-shadow: 0 4px 15 rgba(38, 112, 232, 0.3);
         }
+
         .refresh-btn:active {
             transform: scale(0.98);
             opacity: 0.9;
         }
     </style>
 </head>
+
 <body>
 
     <div class="container">
@@ -112,21 +127,24 @@
             <div class="route-title" id="routeDisplay">Localisation...</div>
             <div class="route-sub" id="modeDisplay">Géolocalisation Active</div>
         </div>
-        
+
         <div id="board">
             <div class="loader">Calcul de la position GPS...</div>
         </div>
-        
+
         <button class="refresh-btn" onclick="initTransit()">Actualiser</button>
     </div>
 
     <script>
         // Insert your SNCF Open Data API Key here
-        const API_KEY = "26f1cc4f-babf-4556-b4ea-e672b44c0385"; 
-        
+        const API_KEY = "26f1cc4f-babf-4556-b4ea-e672b44c0385";
+
         // Station IDs
         const ST_GERMAIN = "stop_area:SNCF:87732206";
-        const VICHY = "stop_area:SNCF:87732248"; 
+        const VICHY = "stop_area:SNCF:87732248";
+
+        //Parameters
+        const PAGE_COUNT = 25;
 
         // Coordinates for proximity check
         const LAT_ST_GERMAIN = 46.2019;
@@ -169,14 +187,25 @@
             }
         }
 
+
+        /**
+        
+        
+        Les trains avec les données suivantes ne doivent pas être listés:
+        - si intercité
+        - si indirect
+        - si autocar
+        
+        **/
+
         async function fetchTrains() {
             const board = document.getElementById('board');
             const routeDisplay = document.getElementById('routeDisplay');
-            
+
             routeDisplay.innerText = currentConfig.label;
             board.innerHTML = '<div class="loader">Recherche des trains...</div>';
 
-            const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${currentConfig.from}/departures?datetime=${getSncfDateTime()}&count=15`;
+            const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${currentConfig.from}/departures?datetime=${getSncfDateTime()}&count=${PAGE_COUNT}`;
 
             try {
                 const response = await fetch(url, {
@@ -193,6 +222,7 @@
         }
 
         function displayTrains(departures) {
+
             const board = document.getElementById('board');
             board.innerHTML = '';
 
@@ -201,13 +231,36 @@
                 return;
             }
 
-            const filteredTrains = departures.filter(dep => {
-                const direction = (dep.display_informations?.direction || "").toLowerCase();
-                if (currentConfig.from === ST_GERMAIN) {
-                    return direction.includes("clermont") || direction.includes("vichy");
-                } else {
-                    return direction.includes("moulins") || direction.includes("paris") || direction.includes("nevers");
+            // This creates a clean list with all TGVs completely removed
+            const filteredTrains = departures.filter(departure => {
+
+                const disp = departure.display_informations;
+
+                // 1. Strict TER-Only Block (Kills all Intercités and TGVs instantly)
+                if (disp && disp.physical_mode
+                    && (disp.physical_mode.includes("TER") || disp.physical_mode.includes("Train grande vitesse"))
+                    && (disp.commercial_mode || "").toLowerCase() !== "intercités"
+
+                ) {
+                    const direction = (disp.direction || "").toLowerCase();
+
+                    // 2. The Direction Toggle
+                    if (currentConfig.from === ST_GERMAIN) {
+                        // Option A: Southbound Route
+                        return direction.includes("brioude") ||
+                            direction.includes("clermont") ||
+                            direction.includes("issoire") ||
+                            direction.includes("vic-le-comte") ||
+                            direction.includes("vichy");
+                    } else {
+                        // Option B: Northbound Route (This matches your SNCF screenshot perfectly)
+                        return direction.includes("moulins") ||
+                            direction.includes("paris") ||
+                            direction.includes("nevers");
+                    }
                 }
+                return false;
+
             });
 
             if (filteredTrains.length === 0) {
@@ -215,16 +268,30 @@
                 return;
             }
 
-	    // This creates a clean list with all TGVs completely removed
-	    const regionalTrainsOnly = filteredTrains.filter(train => train.type !== "TGV");
+            let prevDateStr = "";
+            filteredTrains.forEach(train => {
 
-            regionalTrainsOnly.slice(0, 3).forEach(train => {
+                const dateStr = getDisplayDate(train.stop_date_time.departure_date_time);
+
+                if (prevDateStr !== dateStr) {
+                    const dateLabel = document.createElement('div');
+                    dateLabel.className = 'date-label';
+                    dateLabel.innerHTML = `${dateStr}`;
+                    board.appendChild(dateLabel);
+
+                }
+                prevDateStr = dateStr;
+
                 const timeStr = train.stop_date_time.departure_date_time;
                 const horaire = `${timeStr.substring(9, 11)}:${timeStr.substring(11, 13)}`;
-                
-                const mode = train.display_informations.commercial_mode || "TER";
-                const num = train.display_informations.headsign || "";
-                
+
+                const commMode = train.display_informations.commercial_mode || "--";
+                const physMode = train.display_informations.physical_mode || "--";
+
+                const network = train.display_informations.network || "--";
+                const num = train.display_informations.headsign || "--";
+                const direction = train.display_informations.direction || "--";
+
                 const baseTime = train.stop_date_time.base_departure_date_time;
                 const amedTime = train.stop_date_time.departure_date_time;
                 const isDelayed = baseTime !== amedTime;
@@ -234,12 +301,48 @@
                 card.innerHTML = `
                     <div class="time">${horaire}</div>
                     <div class="details">
-                        <span class="type">${mode} ${num}</span>
+                        <div class="type">train ${num}</div>
+			<div class="type">${direction}</div>
                         ${isDelayed ? '<div class="status-delayed">Retardé</div>' : ''}
                     </div>
                 `;
                 board.appendChild(card);
+
             });
+        }
+
+        function getDisplayDate(rawDate = "20260611T210000") {
+
+            if (typeof rawDate !== 'string' || rawDate.length < 15) {
+                return "Date invalide";
+            }
+
+            // 1. Extract the parts and convert to a standard ISO 8601 string
+            const year = rawDate.substring(0, 4);
+            const month = rawDate.substring(4, 6);
+            const day = rawDate.substring(6, 8);
+            const hour = rawDate.substring(9, 11);
+            const min = rawDate.substring(11, 13);
+            const sec = rawDate.substring(13, 15);
+
+            // Creates "2026-06-12T21:00:00" which JS parses perfectly
+            const isoString = `${year}-${month}-${day}T${hour}:${min}:${sec}`;
+            const dateObj = new Date(isoString);
+
+            // 2. Format the date using the built-in Internationalization API (fr-FR)
+            const options = {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short', // Use 'long' if you want "juin" instead of "juin" / "juil."
+                year: 'numeric'
+            };
+
+            // This outputs: "ven. 12 juin 2026"
+            let formattedDate = new Intl.DateTimeFormat('fr-FR', options).format(dateObj);
+
+            // 3. (Optional) Capitalize the words to perfectly match your example "Ven. 12 Juin 2026"
+            // By default, French formatting keeps weekdays and months lowercase.
+            return formattedDate.replace(/\b\w/g, char => char.toUpperCase());
         }
 
         // Simple Haversine formulation to calculate distance between coordinates
@@ -247,16 +350,16 @@
             const R = 6371; // Radius of the earth in km
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(sqrt => Math.sqrt(a), sqrt => Math.sqrt(1-a));
-            return R * c; 
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(sqrt => Math.sqrt(a), sqrt => Math.sqrt(1 - a));
+            return R * c;
         }
 
         function getSncfDateTime() {
             const now = new Date();
             const pad = n => String(n).padStart(2, '0');
-            return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}T${pad(now.getHours())}${pad(now.getMinutes())}00`;
+            return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}T${pad(now.getHours())}${pad(now.getMinutes())}00`;
         }
 
         // Run application on start
@@ -267,15 +370,16 @@
             initTransit();
         }
 
-	// Register the service worker to make Chrome happy for installation
-	if ('serviceWorker' in navigator) {
-    	window.addEventListener('load', () => {
-        	navigator.serviceWorker.register('./sw.js')
-            	.then(reg => console.log('Service Worker registered'))
-            	.catch(err => console.log('Service Worker failed', err));
-    });
-}
+        // Register the service worker to make Chrome happy for installation
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker failed', err));
+            });
+        }
 
     </script>
 </body>
+
 </html>
