@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transit</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        :root {
+            --bg-color: #0d0e12;
+            --card-color: #161822;
+            --text-main: #ffffff;
+            --text-muted: #8a8f9f;
+            --accent: #47a7f5;
+            --accent-gradient: linear-gradient(135deg, #47a7f5, #2670e8);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .container {
+            width: 100%;
+            max-width: 380px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .route-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 4px;
+        }
+        .route-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .train-card {
+            background-color: var(--card-color);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .time {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+        .details {
+            text-align: right;
+        }
+        .type {
+            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 4px 8px;
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .status-delayed {
+            font-size: 0.8rem;
+            color: #ff5252;
+            font-weight: 600;
+            margin-top: 6px;
+        }
+        .loader {
+            text-align: center;
+            color: var(--text-muted);
+            margin-top: 60px;
+            font-size: 0.95rem;
+        }
+        .refresh-btn {
+            background: var(--accent-gradient);
+            color: #ffffff;
+            border: none;
+            padding: 16px;
+            border-radius: 14px;
+            font-weight: 600;
+            font-size: 1rem;
+            margin-top: 20px;
+            cursor: pointer;
+            width: 100%;
+            box-shadow: 0 4px 15 rgba(38, 112, 232, 0.3);
+        }
+        .refresh-btn:active {
+            transform: scale(0.98);
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <div class="route-title" id="routeDisplay">Localisation...</div>
+            <div class="route-sub" id="modeDisplay">Géolocalisation Active</div>
+        </div>
+        
+        <div id="board">
+            <div class="loader">Calcul de la position GPS...</div>
+        </div>
+        
+        <button class="refresh-btn" onclick="initTransit()">Actualiser</button>
+    </div>
+
+    <script>
+        // Insert your SNCF Open Data API Key here
+        const API_KEY = "26f1cc4f-babf-4556-b4ea-e672b44c0385"; 
+        
+        // Station IDs
+        const ST_GERMAIN = "stop_area:SNCF:87732206";
+        const VICHY = "stop_area:SNCF:87732248"; 
+
+        // Coordinates for proximity check
+        const LAT_ST_GERMAIN = 46.2019;
+        const LON_ST_GERMAIN = 3.4288;
+        const LAT_VICHY = 46.1244;
+        const LON_VICHY = 3.4275;
+
+        // Default setup configuration
+        let currentConfig = { from: ST_GERMAIN, to: VICHY, label: "St-Germain ➔ Vichy" };
+
+        function initTransit() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const userLat = position.coords.latitude;
+                        const userLon = position.coords.longitude;
+
+                        // Calculate distance to both stations
+                        const distToStGermain = getDistance(userLat, userLon, LAT_ST_GERMAIN, LON_ST_GERMAIN);
+                        const distToVichy = getDistance(userLat, userLon, LAT_VICHY, LON_VICHY);
+
+                        // Decide direction based on proximity
+                        if (distToVichy < distToStGermain) {
+                            currentConfig = { from: VICHY, to: ST_GERMAIN, label: "Vichy ➔ St-Germain" };
+                        } else {
+                            currentConfig = { from: ST_GERMAIN, to: VICHY, label: "St-Germain ➔ Vichy" };
+                        }
+                        fetchTrains();
+                    },
+                    (error) => {
+                        console.log("GPS unavailable, fallback to default.");
+                        // Fallback default direction if GPS is off
+                        currentConfig = { from: ST_GERMAIN, to: VICHY, label: "St-Germain ➔ Vichy" };
+                        fetchTrains();
+                    },
+                    { timeout: 5000 }
+                );
+            } else {
+                fetchTrains();
+            }
+        }
+
+        async function fetchTrains() {
+            const board = document.getElementById('board');
+            const routeDisplay = document.getElementById('routeDisplay');
+            
+            routeDisplay.innerText = currentConfig.label;
+            board.innerHTML = '<div class="loader">Recherche des trains...</div>';
+
+            const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${currentConfig.from}/departures?datetime=${getSncfDateTime()}&count=15`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': API_KEY }
+                });
+
+                if (!response.ok) throw new Error();
+                const data = await response.json();
+                displayTrains(data.departures);
+
+            } catch (error) {
+                board.innerHTML = `<div class="loader" style="color: #ff5252;">Erreur réseau ou clé API invalide.</div>`;
+            }
+        }
+
+        function displayTrains(departures) {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+
+            if (!departures || departures.length === 0) {
+                board.innerHTML = '<div class="loader">Aucun train trouvé.</div>';
+                return;
+            }
+
+            const filteredTrains = departures.filter(dep => {
+                const direction = (dep.display_informations?.direction || "").toLowerCase();
+                if (currentConfig.from === ST_GERMAIN) {
+                    return direction.includes("clermont") || direction.includes("vichy");
+                } else {
+                    return direction.includes("moulins") || direction.includes("paris") || direction.includes("nevers");
+                }
+            });
+
+            if (filteredTrains.length === 0) {
+                board.innerHTML = '<div class="loader">Aucun train prévu pour le moment.</div>';
+                return;
+            }
+
+            filteredTrains.slice(0, 3).forEach(train => {
+                const timeStr = train.stop_date_time.departure_date_time;
+                const horaire = `${timeStr.substring(9, 11)}:${timeStr.substring(11, 13)}`;
+                
+                const mode = train.display_informations.commercial_mode || "TER";
+                const num = train.display_informations.headsign || "";
+                
+                const baseTime = train.stop_date_time.base_departure_date_time;
+                const amedTime = train.stop_date_time.departure_date_time;
+                const isDelayed = baseTime !== amedTime;
+
+                const card = document.createElement('div');
+                card.className = 'train-card';
+                card.innerHTML = `
+                    <div class="time">${horaire}</div>
+                    <div class="details">
+                        <span class="type">${mode} ${num}</span>
+                        ${isDelayed ? '<div class="status-delayed">Retardé</div>' : ''}
+                    </div>
+                `;
+                board.appendChild(card);
+            });
+        }
+
+        // Simple Haversine formulation to calculate distance between coordinates
+        function getDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Radius of the earth in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(sqrt => Math.sqrt(a), sqrt => Math.sqrt(1-a));
+            return R * c; 
+        }
+
+        function getSncfDateTime() {
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            return `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}T${pad(now.getHours())}${pad(now.getMinutes())}00`;
+        }
+
+        // Run application on start
+        if (API_KEY === "VOTRE_CLE_API_ICI") {
+            document.getElementById('board').innerHTML = '<div class="loader" style="color: var(--accent);">Veuillez insérer votre clé API.</div>';
+            document.getElementById('routeDisplay').innerText = "Configuration requise";
+        } else {
+            initTransit();
+        }
+    </script>
+</body>
+</html>
