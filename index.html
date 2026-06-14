@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trains Vichy / St Germain des Foss&eacute;s</title>
+    <title>Prochains départs</title>
 
     <link rel="manifest" href="manifest.json">
 
@@ -64,7 +64,7 @@
             letter-spacing: 1px;
         }
 
-        .train-card {
+        .journey-card {
             background-color: var(--card-color);
             border-radius: 14px;
             padding: 20px;
@@ -127,6 +127,149 @@
             transform: scale(0.98);
             opacity: 0.9;
         }
+
+        .controls {
+            position: relative;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+            align-items: center;
+        }
+
+        /* Ensure form elements in the controls row are vertically aligned */
+        .controls .dest-input {
+            height: 44px;
+            box-sizing: border-box;
+            padding: 10px 12px;
+        }
+
+        .suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 6px;
+            background: var(--card-color);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            max-height: 220px;
+            overflow-y: auto;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+            z-index: 10;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 12px 14px;
+            cursor: pointer;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover,
+        .suggestion-item.active {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .controls #destBtn {
+            height: 44px;
+            padding: 0 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .controls #destBtn {
+            min-width: 88px;
+            width: auto;
+            padding: 8px 12px;
+            margin-top: 0;
+            box-sizing: border-box;
+            line-height: 1;
+            font-size: 0.95rem;
+        }
+
+        .loader.error {
+            color: #ff5252;
+        }
+
+        .loader.accent {
+            color: var(--accent);
+        }
+
+        .dest-input {
+            flex: 1;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-main);
+            font-size: 0.95rem;
+        }
+
+        /* Mobile toggle switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 26px;
+        }
+
+        .switch input {
+            display: none;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 255, 0.12);
+            transition: .2s;
+            border-radius: 26px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            top: 3px;
+            background-color: white;
+            transition: .2s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background: var(--accent-gradient);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
     </style>
 </head>
 
@@ -136,6 +279,22 @@
         <div class="header">
             <div class="route-title" id="routeDisplay">Localisation...</div>
             <div class="route-sub" id="modeDisplay">Géolocalisation Active</div>
+        </div>
+
+        <div class="toggle-row">
+            <label class="toggle-label">
+                <span>Auto</span>
+                <label class="switch">
+                    <input id="autoToggle" type="checkbox" />
+                    <span class="slider"></span>
+                </label>
+            </label>
+        </div>
+
+        <div class="controls">
+            <input id="destInput" class="dest-input" placeholder="Destination (ex: Vichy)" autocomplete="off" />
+            <button id="destBtn" class="refresh-btn">OK</button>
+            <div id="destSuggestions" class="suggestions" aria-label="Suggestions de gares" role="listbox"></div>
         </div>
 
         <div id="board">
@@ -151,10 +310,10 @@
 
         // Station IDs
         const ST_GERMAIN = "stop_area:SNCF:87732206";
-        const VICHY = "stop_area:SNCF:87732248";
+        const VICHY = "stop_area:SNCF:87732008";
 
         //Parameters
-        const PAGE_COUNT = 25;
+        const PAGE_COUNT = 15;
 
         // Coordinates for proximity check
         const LAT_ST_GERMAIN = 46.2019;
@@ -163,7 +322,63 @@
         const LON_VICHY = 3.4275;
 
         // Default setup configuration
-        let currentConfig = { from: ST_GERMAIN, to: VICHY, label: "St-Germain ➔ Vichy" };
+        let currentConfig = {
+            from: {
+                id: ST_GERMAIN
+            },
+            to: {
+                id: VICHY,
+                name: 'Vichy'
+            },
+            label: "St-Germain ➔ Vichy"
+        };
+        const AUTO_TOGGLE_KEY = 'autoSGV';
+
+        // Initialize UI controls (toggle state and button)
+        const autoToggleEl = document.getElementById('autoToggle');
+        const destInputEl = document.getElementById('destInput');
+        const destBtnEl = document.getElementById('destBtn');
+
+        // Load persisted toggle state (default: enabled). If no stored value, set it to true.
+        const stored = localStorage.getItem(AUTO_TOGGLE_KEY);
+        let autoEnabled = stored === null ? true : (stored === 'true');
+        if (stored === null) {
+            try { localStorage.setItem(AUTO_TOGGLE_KEY, 'true'); } catch (e) { /* ignore */ }
+        }
+        if (autoToggleEl) {
+            autoToggleEl.checked = autoEnabled;
+            autoToggleEl.addEventListener('change', (e) => {
+                autoEnabled = e.target.checked;
+                localStorage.setItem(AUTO_TOGGLE_KEY, autoEnabled ? 'true' : 'false');
+                updateDestVisibility();
+                applyAutoDestination();
+                fetchJourneys();
+            });
+        }
+
+        const destSuggestionsEl = document.getElementById('destSuggestions');
+        let suggestionTimeout = null;
+
+        if (destBtnEl) {
+            destBtnEl.addEventListener('click', () => setDestinationFromInput());
+        }
+
+        if (destInputEl) {
+            destInputEl.addEventListener('input', () => {
+                clearDestinationSuggestions();
+                const raw = destInputEl.value.trim();
+                if (!raw || isAutoEnabled() || raw.length < 2) return;
+                if (suggestionTimeout) clearTimeout(suggestionTimeout);
+                suggestionTimeout = setTimeout(() => loadDestinationSuggestions(raw), 250);
+            });
+
+            destInputEl.addEventListener('blur', () => {
+                window.setTimeout(clearDestinationSuggestions, 200);
+            });
+        }
+
+        // Initialize visibility according to stored toggle
+        if (autoToggleEl) updateDestVisibility();
 
         function initTransit() {
             if (navigator.geolocation) {
@@ -176,46 +391,45 @@
                         const distToStGermain = getDistance(userLat, userLon, LAT_ST_GERMAIN, LON_ST_GERMAIN);
                         const distToVichy = getDistance(userLat, userLon, LAT_VICHY, LON_VICHY);
 
-                        // Decide direction based on proximity
+                        // Always set origin based on proximity
                         if (distToVichy < distToStGermain) {
-                            currentConfig = { from: VICHY, to: ST_GERMAIN, label: "Vichy ➔ St-Germain" };
+                            currentConfig.from.id = VICHY;
                         } else {
-                            currentConfig = { from: ST_GERMAIN, to: VICHY, label: "St-Germain ➔ Vichy" };
+                            currentConfig.from.id = ST_GERMAIN;
                         }
-                        fetchTrains();
+
+                        applyAutoDestination();
+                        fetchJourneys();
                     },
-                    (error) => {
-                        console.log("GPS unavailable, fallback to default.");
-                        // Fallback default direction if GPS is off
-                        currentConfig = { from: ST_GERMAIN, to: VICHY, label: "St-Germain ➔ Vichy" };
-                        fetchTrains();
+                    () => {
+                        // Fallback origin when GPS is unavailable
+                        currentConfig.from.id = ST_GERMAIN;
+                        applyAutoDestination();
+                        fetchJourneys();
                     },
                     { timeout: 5000 }
                 );
             } else {
-                fetchTrains();
+                fetchJourneys();
             }
         }
 
-
         /**
-        
-        
-        Les trains avec les données suivantes ne doivent pas être listés:
-        - si intercité
+ 
+        Les journeys avec les données suivantes ne doivent pas être listés:
+
         - si indirect
         - si autocar
         
         **/
-
-        async function fetchTrains() {
+        async function fetchJourneys() {
             const board = document.getElementById('board');
             const routeDisplay = document.getElementById('routeDisplay');
 
             routeDisplay.innerText = currentConfig.label;
-            board.innerHTML = '<div class="loader">Recherche des trains...</div>';
+            board.innerHTML = '<div class="loader">Recherche...</div>';
 
-            const url = `https://api.sncf.com/v1/coverage/sncf/stop_areas/${currentConfig.from}/departures?datetime=${getSncfDateTime()}&count=${PAGE_COUNT}`;
+            const url = `https://api.sncf.com/v1/coverage/sncf/journeys?from=${currentConfig.from.id}&to=${currentConfig.to.id}&max_nb_transfers=0&forbidden_uris%5B%5D=physical_mode%3ACoach&forbidden_uris%5B%5D=physical_mode%3ABus&count=${PAGE_COUNT}`;
 
             try {
                 const response = await fetch(url, {
@@ -224,101 +438,258 @@
 
                 if (!response.ok) throw new Error();
                 const data = await response.json();
-                displayTrains(data.departures);
+
+                const departures = parseDirectJourneys(data);
+
+                displayJourneys(departures);
 
             } catch (error) {
-                board.innerHTML = `<div class="loader" style="color: #ff5252;">Erreur réseau ou clé API invalide.</div>`;
+                board.innerHTML = `<div class="loader error">Erreur réseau ou clé API invalide.</div>`;
             }
         }
 
-        function displayTrains(departures) {
-
+        function displayJourneys(departures) {
             const board = document.getElementById('board');
             board.innerHTML = '';
 
             if (!departures || departures.length === 0) {
-                board.innerHTML = '<div class="loader">Aucun train trouvé.</div>';
+                board.innerHTML = '<div class="loader">Aucun trajet trouvé.</div>';
                 return;
             }
 
-            // This creates a clean list with all TGVs completely removed
-            const filteredTrains = departures.filter(departure => {
+            const destValue = getDestinationString();
+            const destFilter = currentConfig.to || destValue;
+            const autoToggleOn = isAutoEnabled();
 
-                const disp = departure.display_informations;
-
-                // 1. Strict TER-Only Block (Kills all Intercités and TGVs instantly)
-                if (disp && disp.physical_mode
-                    && (disp.physical_mode.includes("TER") || disp.physical_mode.includes("Train grande vitesse"))
-                    && (disp.commercial_mode || "").toLowerCase() !== "intercités"
-
-                ) {
-                    const direction = (disp.direction || "").toLowerCase();
-
-                    // 2. The Direction Toggle
-                    if (currentConfig.from === ST_GERMAIN) {
-                        // Option A: Southbound Route
-                        return direction.includes("brioude") ||
-                            direction.includes("clermont") ||
-                            direction.includes("issoire") ||
-                            direction.includes("vic-le-comte") ||
-                            direction.includes("vichy");
-                    } else {
-                        // Option B: Northbound Route (This matches your SNCF screenshot perfectly)
-                        return direction.includes("moulins") ||
-                            direction.includes("paris") ||
-                            direction.includes("nevers");
-                    }
-                }
-                return false;
-
-            });
-
-            if (filteredTrains.length === 0) {
-                board.innerHTML = '<div class="loader">Aucun train prévu pour le moment.</div>';
+            if (!autoToggleOn && !destValue) {
+                board.innerHTML = '<div class="loader">Choisissez une destination (désactivez l\'option automatique ou entrez une gare).</div>';
                 return;
             }
 
             let prevDateStr = "";
-            filteredTrains.forEach(train => {
-
-                const dateStr = getDisplayDate(train.stop_date_time.departure_date_time);
+            departures.forEach(departure => {
+                const dateStr = getDisplayDate(departure.departureTime);
 
                 if (prevDateStr !== dateStr) {
                     const dateLabel = document.createElement('div');
                     dateLabel.className = 'date-label';
                     dateLabel.innerHTML = `${dateStr}`;
                     board.appendChild(dateLabel);
-
                 }
                 prevDateStr = dateStr;
 
-                const timeStr = train.stop_date_time.departure_date_time;
+                const timeStr = departure.departureTime;
                 const horaire = `${timeStr.substring(9, 11)}:${timeStr.substring(11, 13)}`;
 
-                const commMode = train.display_informations.commercial_mode || "--";
-                const physMode = train.display_informations.physical_mode || "--";
+                const num = departure.headsign || "--";
+                const direction = departure.direction || "--";
 
-                const network = train.display_informations.network || "--";
-                const num = train.display_informations.headsign || "--";
-                const direction = train.display_informations.direction || "--";
-
-                const baseTime = train.stop_date_time.base_departure_date_time;
-                const amedTime = train.stop_date_time.departure_date_time;
+                const baseTime = departure.baseDepartureTime;
+                const amedTime = departure.departureTime;
                 const isDelayed = baseTime !== amedTime;
+                const arrivalTime = getDisplayTime(departure.arrivalTime);
 
                 const card = document.createElement('div');
-                card.className = 'train-card';
+                card.className = 'journey-card';
                 card.innerHTML = `
                     <div class="time">${horaire}</div>
                     <div class="details">
-                        <div class="type">train ${num}</div>
-			<div class="type">${direction}</div>
+                        <div class="type">n° ${num}</div>
+                        <div class="type">arrivée prévue à ${arrivalTime}</div>
+                        <div class="type">${direction}</div>
                         ${isDelayed ? '<div class="status-delayed">Retardé</div>' : ''}
                     </div>
                 `;
                 board.appendChild(card);
-
             });
+        }
+
+        function parseDirectJourneys(apiResponse) {
+            const journeys = apiResponse.journeys || [];
+
+            return journeys.map(journey => {
+                // 1. Get the baseline departure and arrival timestamps
+                const departureTime = journey.departure_date_time; // e.g., "20260614T184500"
+                const arrivalTime = journey.arrival_date_time;   // e.g., "20260614T191700"
+
+                // 2. Isolate the active public transit section
+                const transitSection = journey.sections.find(sec => sec.type === "public_transport");
+
+                const baseDepartureTime = transitSection.base_departure_date_time;   // e.g., "20260614T191700"
+                const baseArrivalTime = transitSection.base_arrival_date_time;   // e.g., "20260614T191700"
+                const displayInfo = transitSection?.display_informations || {};
+
+                // 3. Extract the final destination
+                const direction = displayInfo.direction || "Destination Inconnue";
+
+                // 4. Extract the journey headsign (Check headsign first, fallback to code)
+                const headsign = displayInfo.headsign || displayInfo.code || "Numéro inconnu";
+
+                // 5. Grab the commercial mode (e.g., "Intercités", "REGIONAURA")
+                const commercialMode = displayInfo.commercial_mode || "";
+
+                // 6. Grab the physical mode (e.g., "Autocar", "TER / Intercités")
+                const physicalMode = displayInfo.physical_mode || "";
+
+                return {
+                    departureTime: departureTime,
+                    baseDepartureTime: baseDepartureTime,
+                    arrivalTime: arrivalTime,
+                    direction: direction,
+                    headsign: headsign,
+                    commercialMode: `${commercialMode} ${headsign}`.trim(),
+                    physicalMode: physicalMode
+                };
+            });
+        }
+
+        async function loadDestinationSuggestions(query) {
+            if (!destSuggestionsEl) return;
+            const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(query)}&type=stop_area&count=8`;
+            try {
+                const response = await fetch(url, { headers: { 'Authorization': API_KEY } });
+                if (!response.ok) {
+                    clearDestinationSuggestions();
+                    return;
+                }
+                const data = await response.json();
+                const suggestions = data.places || data.stop_areas || [];
+                renderDestinationSuggestions(suggestions);
+            } catch (e) {
+                clearDestinationSuggestions();
+            }
+        }
+
+        function renderDestinationSuggestions(items) {
+            if (!destSuggestionsEl) return;
+            destSuggestionsEl.innerHTML = '';
+            if (!items || items.length === 0) {
+                clearDestinationSuggestions();
+                return;
+            }
+
+            items.forEach(item => {
+                const name = item.name || item.label || '';
+                const id = item.id || item.stop_area || item.uri || '';
+                if (!name || !id) return;
+
+                const option = document.createElement('div');
+                option.className = 'suggestion-item';
+                option.setAttribute('role', 'option');
+                option.innerText = name;
+                option.addEventListener('click', () => {
+                    destInputEl.value = name;
+                    currentConfig.to = { id, name };
+                    currentConfig.label = `${currentConfig.from.id === ST_GERMAIN ? 'St-Germain' : 'Vichy'} → ${name}`;
+                    clearDestinationSuggestions();
+                    //fetchJourneys();
+                });
+                destSuggestionsEl.appendChild(option);
+            });
+            destSuggestionsEl.style.display = 'block';
+        }
+
+        function clearDestinationSuggestions() {
+            if (!destSuggestionsEl) return;
+            destSuggestionsEl.innerHTML = '';
+            destSuggestionsEl.style.display = 'none';
+        }
+
+        // Show/hide destination input and button based on auto-toggle state
+        function updateDestVisibility() {
+            const autoOn = (autoToggleEl && autoToggleEl.checked) || autoEnabled;
+            const show = !autoOn;
+            if (destInputEl) destInputEl.style.display = show ? '' : 'none';
+            if (destBtnEl) destBtnEl.style.display = show ? '' : 'none';
+            if (autoOn) clearDestinationSuggestions();
+        }
+
+        function isAutoEnabled() {
+            return (autoToggleEl && autoToggleEl.checked) || autoEnabled;
+        }
+
+        function applyAutoDestination() {
+            const autoOn = isAutoEnabled();
+            if (autoOn) {
+                if (currentConfig.from.id === ST_GERMAIN) {
+                    currentConfig.to = { id: VICHY, name: 'Vichy' };
+                    currentConfig.label = "St-Germain ➔ Vichy";
+                } else {
+                    currentConfig.to = { id: ST_GERMAIN, name: 'St-Germain' };
+                    currentConfig.label = "Vichy ➔ St-Germain";
+                }
+            } else {
+                currentConfig.to = null;
+                currentConfig.label = (currentConfig.from.id === ST_GERMAIN) ? "St-Germain — Choisir destination" : "Vichy — Choisir destination";
+            }
+        }
+
+        // Try to resolve a typed station name to a stop_area via SNCF places API
+        async function lookupStopArea(query) {
+            if (!query) return null;
+            const url = `https://api.sncf.com/v1/coverage/sncf/places?q=${encodeURIComponent(query)}&type=stop_area`;
+            try {
+                const resp = await fetch(url, { headers: { 'Authorization': API_KEY } });
+                if (!resp.ok) return null;
+                const json = await resp.json();
+                const places = json.places || json.stop_areas || [];
+                if (places && places.length > 0) {
+                    const p = places[0];
+                    return { id: p.id || p.stop_area || p.uri || null, name: p.name || p.label || query };
+                }
+            } catch (e) {
+                // ignore lookup errors — we'll fallback to heuristics
+            }
+            return null;
+        }
+
+        async function setDestinationFromInput() {
+            const raw = (destInputEl && destInputEl.value || '').trim();
+            if (!raw) return;
+
+            // First try a remote lookup to get an authoritative stop_area id
+            const found = await lookupStopArea(raw);
+            if (found && found.id) {
+                currentConfig.to = { id: found.id, name: found.name };
+                currentConfig.label = (currentConfig.from.id === found.id) ? `${found.name} ➔ ${found.name}` : `${currentConfig.from.id === ST_GERMAIN ? 'St-Germain' : 'Vichy'} → ${found.name}`;
+                fetchJourneys();
+                return;
+            }
+
+            // Fallback heuristics for the two main stations
+            const val = raw.toLowerCase();
+            if (val.includes('vich')) {
+                currentConfig.to = { id: VICHY, name: 'Vichy' };
+                currentConfig.label = (currentConfig.from.id === VICHY) ? "Vichy ➔ Vichy" : "→ Vichy";
+            } else if (val.includes('germain') || val.includes('saint') || val.includes('st ')) {
+                currentConfig.to = { id: ST_GERMAIN, name: 'St-Germain' };
+                currentConfig.label = (currentConfig.from.id === ST_GERMAIN) ? "St-Germain ➔ St-Germain" : "→ St-Germain";
+            } else {
+                // Use the raw text as a name fragment to match against returned departures
+                currentConfig.to = raw;
+                currentConfig.label = `${currentConfig.from.id === ST_GERMAIN ? 'St-Germain' : 'Vichy'} → ${raw}`;
+            }
+
+            fetchJourneys();
+        }
+
+        function getDestinationString() {
+            if (typeof currentConfig.to === 'string') {
+                return currentConfig.to.trim();
+            }
+            if (currentConfig.to && typeof currentConfig.to === 'object' && currentConfig.to.name) {
+                return String(currentConfig.to.name).trim();
+            }
+            return (destInputEl && destInputEl.value || '').trim();
+        }
+
+        function getDisplayTime(rawDate = "20260611T210000") {
+            if (typeof rawDate !== 'string' || rawDate.length < 15) {
+                return "??:??";
+            }
+            const hour = rawDate.substring(9, 11);
+            const min = rawDate.substring(11, 13);
+            return `${hour}:${min}`;
         }
 
         function getDisplayDate(rawDate = "20260611T210000") {
@@ -355,14 +726,15 @@
             return formattedDate.replace(/\b\w/g, char => char.toUpperCase());
         }
 
-        // Simple Haversine formulation to calculate distance between coordinates
+        // Fixed Haversine formulation to calculate distance between coordinates (in km)
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; // Radius of the earth in km
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const toRad = deg => deg * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
             const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-            const c = 2 * Math.atan2(sqrt => Math.sqrt(a), sqrt => Math.sqrt(1 - a));
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return R * c;
         }
 
@@ -374,7 +746,7 @@
 
         // Run application on start
         if (API_KEY === "VOTRE_CLE_API_ICI") {
-            document.getElementById('board').innerHTML = '<div class="loader" style="color: var(--accent);">Veuillez insérer votre clé API.</div>';
+            document.getElementById('board').innerHTML = '<div class="loader accent">Veuillez insérer votre clé API.</div>';
             document.getElementById('routeDisplay').innerText = "Configuration requise";
         } else {
             initTransit();
@@ -384,8 +756,9 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker registered'))
-                    .catch(err => console.log('Service Worker failed', err));
+                    .catch(() => {
+                        /* service worker registration failed silently */
+                    });
             });
         }
 
