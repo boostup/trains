@@ -1,0 +1,239 @@
+:root {
+    --bg-color: #0d0e12;
+    --card-color: #161822;
+    --text-main: #ffffff;
+    --text-muted: #8a8f9f;
+    --accent: #47a7f5;
+    --accent-gradient: linear-gradient(135deg, #47a7f5, #2670e8);
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    margin: 0;
+    padding: 24px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.container {
+    width: 100%;
+    max-width: 380px;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.route-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+}
+
+.route-sub {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.toggle-row {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 18px;
+}
+
+.toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+    font-size: 0.95rem;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 46px;
+    height: 26px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.slider:before {
+    content: "";
+    position: absolute;
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    top: 3px;
+    background-color: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    transition: transform 180ms ease;
+}
+
+.switch input:checked+.slider {
+    background-color: var(--accent);
+}
+
+.switch input:checked+.slider:before {
+    transform: translateX(20px);
+}
+
+.journey-card {
+    background-color: var(--card-color);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.time {
+    font-size: 2.2rem;
+    font-weight: 800;
+    letter-spacing: -1px;
+}
+
+.details {
+    text-align: right;
+}
+
+.type {
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.status-delayed {
+    font-size: 0.8rem;
+    color: #ff5252;
+    font-weight: 600;
+    margin-top: 6px;
+}
+
+.loader {
+    text-align: center;
+    color: var(--text-muted);
+    margin-top: 60px;
+    font-size: 0.95rem;
+}
+
+.refresh-btn {
+    background: var(--accent-gradient);
+    color: #ffffff;
+    border: none;
+    padding: 16px;
+    border-radius: 14px;
+    font-weight: 600;
+    font-size: 1rem;
+    margin-top: 20px;
+    cursor: pointer;
+    width: 100%;
+    box-shadow: 0 4px 15 rgba(38, 112, 232, 0.3);
+}
+
+.controls {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+    align-items: center;
+}
+
+.controls .dest-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-main);
+    height: 48px;
+    box-sizing: border-box;
+}
+
+.controls .refresh-btn {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0 20px;
+    height: 48px;
+    margin-top: 0;
+    box-sizing: border-box;
+}
+}
+
+.dest-input {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--text-main)
+}
+
+.suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 6px;
+    background: var(--card-color);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    max-height: 220px;
+    overflow-y: auto;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+    z-index: 10;
+    display: none
+}
+
+.suggestion-item {
+    padding: 12px 14px;
+    cursor: pointer;
+    color: var(--text-main);
+    font-size: 0.95rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05)
+}
+
+.suggestion-item:last-child {
+    border-bottom: none
+}
+
+/* small helpers */
+.date-label {
+    margin: 8px 0;
+    color: var(--text-muted);
+    font-size: 0.9rem
+}
