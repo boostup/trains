@@ -104,11 +104,7 @@ function initMainApp() {
         }
     });
 
-    if (currentConfig.defaultRoute) {
-        fetchSncbJourneys();
-    } else {
-        initGeolocationAndProximity();
-    }
+    initGeolocationAndProximity();
 
     dispatchNavigate('board');
 }

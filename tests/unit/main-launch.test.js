@@ -130,12 +130,7 @@ describe('app launch shows next departures board', () => {
             clear: () => { Object.keys(storedItems).forEach(k => delete storedItems[k]); }
         });
 
-        vi.stubGlobal('window', {
-            dispatchEvent: () => true,
-            addEventListener: () => {},
-            removeEventListener: () => {},
-            matchMedia: () => ({ matches: false })
-        });
+        vi.stubGlobal('window', createWindowStub(true));
 
         vi.resetModules();
         setupDom();
