@@ -153,35 +153,74 @@ function initApiKeySettings() {
 
 function initGeolocationAndProximity() {
     const boardEl = document.getElementById('journeys-board');
-    boardEl.innerHTML = '<div class="sys-msg">Calcul de la position GPS...</div>';
+    boardEl.innerHTML = '<div class="sys-msg">Calcul de la position GPS…</div>';
 
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const uLat = position.coords.latitude;
-                const uLon = position.coords.longitude;
-
-                const distToStGermain = getHaversineDistance(uLat, uLon, DEFAULT_STATIONS.ST_GERMAIN.lat, DEFAULT_STATIONS.ST_GERMAIN.lon);
-                const distToVichy = getHaversineDistance(uLat, uLon, DEFAULT_STATIONS.VICHY.lat, DEFAULT_STATIONS.VICHY.lon);
-
-                if (distToVichy < distToStGermain) {
-                    currentConfig.from = DEFAULT_STATIONS.VICHY;
-                    currentConfig.to = DEFAULT_STATIONS.ST_GERMAIN;
-                } else {
-                    currentConfig.from = DEFAULT_STATIONS.ST_GERMAIN;
-                    currentConfig.to = DEFAULT_STATIONS.VICHY;
-                }
-            },
-            () => {
-                currentConfig.from = DEFAULT_STATIONS.ST_GERMAIN;
-                currentConfig.to = DEFAULT_STATIONS.VICHY;
-            },
-            { timeout: 4000 }
-        );
-    } else {
+    if (!navigator.geolocation) {
+        boardEl.innerHTML = `
+            <div class="sys-msg" style="color: #ff5252;">
+                La géolocalisation n'est pas supportée par votre navigateur.
+                <br>Origine par défaut : St-Germain-des-Fossés.
+                <br>Vous pouvez modifier gare de départ dans le champ de recherche.
+            </div>`;
         currentConfig.from = DEFAULT_STATIONS.ST_GERMAIN;
         currentConfig.to = DEFAULT_STATIONS.VICHY;
+        return;
     }
+
+    const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000,
+    };
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const uLat = position.coords.latitude;
+            const uLon = position.coords.longitude;
+
+            const distToStGermain = getHaversineDistance(uLat, uLon, DEFAULT_STATIONS.ST_GERMAIN.lat, DEFAULT_STATIONS.ST_GERMAIN.lon);
+            const distToVichy = getHaversineDistance(uLat, uLon, DEFAULT_STATIONS.VICHY.lat, DEFAULT_STATIONS.VICHY.lon);
+
+            if (distToVichy < distToStGermain) {
+                currentConfig.from = DEFAULT_STATIONS.VICHY;
+                currentConfig.to = DEFAULT_STATIONS.ST_GERMAIN;
+            } else {
+                currentConfig.from = DEFAULT_STATIONS.ST_GERMAIN;
+                currentConfig.to = DEFAULT_STATIONS.VICHY;
+            }
+        },
+        (error) => {
+            let message = '';
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    message = 'La géolocalisation a été refusée. Veuillez l\'autoriser dans les paramètres de votre navigateur ou réessayer.';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = 'La position GPS est indisponible. Vérifiez que les services de localisation sont activés.';
+                    break;
+                case error.TIMEOUT:
+                    message = 'Le positionnement GPS a pris trop de temps. Réessayez en vous assurant que vous êtes près d\'une fenêtre.';
+                    break;
+                default:
+                    message = 'Une erreur de géolocalisation est survenue.';
+            }
+            boardEl.innerHTML = `
+                <div class="sys-msg" style="color: #ff5252;">
+                    ${message}
+                    <br><br>
+                    <button id="retry-geolocation-btn" class="action-btn-accent">Réessayer</button>
+                    <span style="margin-left: 8px;">— sinon, St-Germain-des-Fossés sera utilisé comme origine.</span>
+                </div>`;
+            currentConfig.from = DEFAULT_STATIONS.ST_GERMAIN;
+            currentConfig.to = DEFAULT_STATIONS.VICHY;
+
+            const retryBtn = document.getElementById('retry-geolocation-btn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', initGeolocationAndProximity);
+            }
+        },
+        options
+    );
 }
 
 async function fetchSncbJourneys() {

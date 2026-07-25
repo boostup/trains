@@ -248,4 +248,90 @@ describe('app launch shows next departures board', () => {
         const journeysBoard = document.getElementById('journeys-board');
         expect(journeysBoard.innerHTML).toContain('TGV123');
     });
+
+    it('falls back to default stations (St Germain → Vichy) when geolocation permission is denied', async () => {
+        vi.stubGlobal('window', createWindowStub(true));
+
+        vi.stubGlobal('navigator', {
+            geolocation: {
+                getCurrentPosition: (success, error) => {
+                    error({ code: 1, message: 'Permission denied' });
+                }
+            }
+        });
+
+        const { currentConfig } = await import('../../src/state.js');
+        currentConfig.apiKey = 'test-api-key';
+        currentConfig.defaultRoute = null;
+
+        await import('../../src/components/screen-manager/screen-manager.js');
+        await import('../../src/components/header-actions/header-actions.js');
+        await import('../../src/components/auto-complete/auto-complete.js');
+        await import('../../src/components/clear-button/clear-button.js');
+        await import('../../src/components/refresh-button/refresh-button.js');
+        await import('../../src/components/journey-card/journey-card.js');
+        await import('../../src/main.js');
+
+        document.dispatchEvent(new Event('DOMContentLoaded'));
+
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(currentConfig.from.name).toBe('St-Germain-des-Fossés');
+        expect(currentConfig.to.name).toBe('Vichy');
+    });
+
+    it('falls back to default stations (St Germain → Vichy) when geolocation times out', async () => {
+        vi.stubGlobal('window', createWindowStub(true));
+
+        vi.stubGlobal('navigator', {
+            geolocation: {
+                getCurrentPosition: (success, error) => {
+                    error({ code: 3, message: 'Timeout' });
+                }
+            }
+        });
+
+        const { currentConfig } = await import('../../src/state.js');
+        currentConfig.apiKey = 'test-api-key';
+        currentConfig.defaultRoute = null;
+
+        await import('../../src/components/screen-manager/screen-manager.js');
+        await import('../../src/components/header-actions/header-actions.js');
+        await import('../../src/components/auto-complete/auto-complete.js');
+        await import('../../src/components/clear-button/clear-button.js');
+        await import('../../src/components/refresh-button/refresh-button.js');
+        await import('../../src/components/journey-card/journey-card.js');
+        await import('../../src/main.js');
+
+        document.dispatchEvent(new Event('DOMContentLoaded'));
+
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(currentConfig.from.name).toBe('St-Germain-des-Fossés');
+        expect(currentConfig.to.name).toBe('Vichy');
+    });
+
+    it('falls back to default stations (St Germain → Vichy) when geolocation is not supported', async () => {
+        vi.stubGlobal('window', createWindowStub(true));
+        vi.stubGlobal('navigator', {});
+
+        const { currentConfig } = await import('../../src/state.js');
+        currentConfig.apiKey = 'test-api-key';
+        currentConfig.defaultRoute = null;
+
+        await import('../../src/components/screen-manager/screen-manager.js');
+        await import('../../src/components/header-actions/header-actions.js');
+        await import('../../src/components/auto-complete/auto-complete.js');
+        await import('../../src/components/clear-button/clear-button.js');
+        await import('../../src/components/refresh-button/refresh-button.js');
+        await import('../../src/components/journey-card/journey-card.js');
+        await import('../../src/main.js');
+
+        document.dispatchEvent(new Event('DOMContentLoaded'));
+
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+        expect(currentConfig.from.name).toBe('St-Germain-des-Fossés');
+        expect(currentConfig.to.name).toBe('Vichy');
+    });
 });
